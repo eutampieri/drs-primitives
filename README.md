@@ -1,3 +1,3 @@
-# OpenRouteService primitives
+# DistributedRouteService primitives
 
-This crate contains the primitives used for ORS
+This crate contains the primitives used for DRS
