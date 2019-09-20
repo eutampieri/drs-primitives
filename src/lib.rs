@@ -230,6 +230,25 @@ pub struct TrainStation {
     pub position: Coord
 }
 
+pub enum TransportType {
+    Foot,
+    Bus,
+    BikeSharing,
+    Train,
+}
+
+/*pub struct JourneyLeg {
+    /// The duration of the leg
+    pub duration: chrono::Duration,
+    /// The mean of transportation used
+    pub transport: TransportType,
+    /// The date and time of departure
+    pub start_date: Option<chrono::DateTime<chrono::Utc>>,
+    /// The leg's path
+    pub path: todo![]//Vec<Segment>,
+    //pub start: 
+}*/
+
 #[cfg(test)]
 mod tests {
     use super::*;
