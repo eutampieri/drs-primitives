@@ -153,7 +153,9 @@ impl Segment {
 
 pub struct Road{
     pub segments: Vec<Segment>,
-    pub name: Option<String>
+    pub name: Option<String>,
+    pub forbidden_to_pedestrians: bool,
+    pun forbidden_to_bikes: bool,
 }
 impl Road{
 
