@@ -217,6 +217,22 @@ impl Road{
         }
         distance
     }
+
+    /// Get the intersections with another road
+    pub fn intersections(&self, with: &Road) -> Vec<Coord> {
+        let mut result: Vec<Coord> = Vec::new();
+        for a_segment in &self.segments {
+            for b_segment in &with.segments {
+                if let Some(intersection) = a_segment.intersection(b_segment){
+                    if result.contains(&intersection) {
+                        continue;
+                    }
+                    result.push(intersection)
+                }
+            }
+        }
+        result
+    }
 }
 
 pub struct BusStop {
