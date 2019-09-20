@@ -42,6 +42,7 @@ impl PartialEq for Coord{
         self.lat == other.lat && self.lon == other.lon
     }
 }
+
 impl Coord{
     /// Get the distance between two points in km
     pub fn distance(&self, from: &Coord) -> f64{
@@ -64,7 +65,8 @@ impl Coord{
 
 pub struct Segment {
     pub a: Coord,
-    pub b: Coord
+    pub b: Coord,
+    pub layer: Option<i8>,
 }
 
 impl Segment {
@@ -72,8 +74,24 @@ impl Segment {
         ((self.a.lat, self.a.lon), ((self.b.lat, self.b.lon)))
     }
 
+    /// Check if two segments are contiguous (i.e. if the end of one segment corresponds with the beginning of another one)
+    pub fn is_contiguous(&self, with: &Segment) -> bool {
+        let delta = (self.a - with.b, self.b - with.a, self.b - with.b, self.a - with.a);
+        ((delta.0.lat.abs() < TOLERANCE && delta.0.lon.abs() < TOLERANCE) ||
+        (delta.1.lat.abs() < TOLERANCE && delta.1.lon.abs() < TOLERANCE) ||
+        (delta.2.lat.abs() < TOLERANCE && delta.2.lon.abs() < TOLERANCE) ||
+        (delta.3.lat.abs() < TOLERANCE && delta.3.lon.abs() < TOLERANCE)) &&
+        !((delta.2.lat.abs() < TOLERANCE && delta.2.lon.abs() < TOLERANCE) &&
+        (delta.3.lat.abs() < TOLERANCE && delta.3.lon.abs() < TOLERANCE))
+    }
+
     /// Check if two segments intersect
     pub fn intersection(&self, other: &Segment) -> Option<Coord> {
+        if let Some(_) = self.layer{
+            if !self.is_contiguous(other) && self.layer !=other.layer{
+                return None;
+            }
+        }
         let p1 = self.a;
         let p2 = self.b;
         let q1 = other.a;
@@ -123,7 +141,7 @@ impl Segment {
 
     /// Return a reversed Segment
     pub fn reverse(&self) -> Segment {
-        Segment{a: self.b, b: self.a}
+        Segment{a: self.b, b: self.a, layer: self.layer}
     }
 
     pub fn contains(&self, point: &Point) -> bool{
@@ -256,7 +274,8 @@ mod tests {
     fn nearest_point_from_segment_near_test() {
         let segment = Segment{
             a: Point{lat:1.0, lon: 1.0},
-            b: Point{lat: 4.0, lon: 4.0}
+            b: Point{lat: 4.0, lon: 4.0},
+            layer: None
         };
         let point = Point{lat: 1.0, lon: 3.0};
 
@@ -267,7 +286,8 @@ mod tests {
     fn nearest_point_from_segment_far_left_test() {
         let segment = Segment{
             a: Point{lat:1.0, lon: 1.0},
-            b: Point{lat: 4.0, lon: 4.0}
+            b: Point{lat: 4.0, lon: 4.0},
+            layer: None
         };
         let point = Point{lat: -1.0, lon: 2.0};
 
@@ -278,7 +298,8 @@ mod tests {
     fn nearest_point_from_segment_far_right_test() {
         let segment = Segment{
             a: Point{lat:1.0, lon: 1.0},
-            b: Point{lat: 4.0, lon: 4.0}
+            b: Point{lat: 4.0, lon: 4.0},
+            layer: None
         };
         let point = Point{lat: 6.0, lon: 5.0};
 
@@ -289,11 +310,13 @@ mod tests {
     fn segment_intersection_easy_test() {
         let first_segment = Segment{
             a: Point{lat:1.0, lon: 1.0},
-            b: Point{lat: 4.0, lon: 4.0}
+            b: Point{lat: 4.0, lon: 4.0},
+            layer: None
         };
         let second_segment = Segment{
             a: Point{lat:1.0, lon: 3.0},
-            b: Point{lat: 3.0, lon: 1.0}
+            b: Point{lat: 3.0, lon: 1.0},
+            layer: None
         };
         assert_eq!(first_segment.intersection(&second_segment), Some(Point{lat: 2.0, lon: 2.0}));
     }
@@ -302,11 +325,13 @@ mod tests {
     fn segment_intersection_end_test() {
         let first_segment = Segment{
             a: Point{lat:1.0, lon: 1.0},
-            b: Point{lat: 4.0, lon: 4.0}
+            b: Point{lat: 4.0, lon: 4.0},
+            layer: None
         };
         let second_segment = Segment{
             a: Point{lat:-1.0, lon: 3.0},
-            b: Point{lat: 1.0, lon: 1.0}
+            b: Point{lat: 1.0, lon: 1.0},
+            layer: None
         };
         assert_eq!(first_segment.intersection(&second_segment), Some(first_segment.a));
     }
@@ -315,11 +340,13 @@ mod tests {
     fn segment_intersection_none_test() {
         let first_segment = Segment{
             a: Point{lat:1.0, lon: 1.0},
-            b: Point{lat: 4.0, lon: 4.0}
+            b: Point{lat: 4.0, lon: 4.0},
+            layer: None
         };
         let second_segment = Segment{
             a: Point{lat:11.0, lon: 3.0},
-            b: Point{lat: 13.0, lon: 1.0}
+            b: Point{lat: 13.0, lon: 1.0},
+            layer: None
         };
         assert_eq!(first_segment.intersection(&second_segment), None);
     }
@@ -328,7 +355,8 @@ mod tests {
     fn on_segment_test() {
         let segment = Segment{
             a: Point{lat:1.0, lon: 1.0},
-            b: Point{lat: 4.0, lon: 4.0}
+            b: Point{lat: 4.0, lon: 4.0},
+            layer: None
         };
         let first_point = Point{
             lat: 2.0,
@@ -357,11 +385,13 @@ mod tests {
             segments: vec![
                 Segment{
                     a: Point{lat:1.0, lon: 1.0},
-                    b: Point{lat: 4.0, lon: 4.0}
+                    b: Point{lat: 4.0, lon: 4.0},
+                    layer: None
                 },
                 Segment{
                     a: Point{lat:4.0, lon: 4.0},
-                    b: Point{lat: 5.0, lon: 4.0}
+                    b: Point{lat: 5.0, lon: 4.0},
+                    layer: None
                 }
             ],
             forbidden_to_pedestrians: false,
@@ -369,6 +399,61 @@ mod tests {
         };
         let point = Point{lat: 2.0, lon: 2.0};
         assert!( (road.length_from(&point, Direction::Backward) + road.length_from(&point, Direction::Forward) - road.length()).abs() < 0.1 );
+    }
+
+    #[test]
+    fn contiguity_test() {
+        let first_segment = Segment{
+            a: Coord{lat:1.0, lon:1.0},
+            b: Coord{lat:1.0, lon: 2.0},
+            layer: None
+        };
+        let second_segment = Segment{
+            a: Coord{lat:5.0, lon:1.0},
+            b: Coord{lat:1.0, lon: 2.0},
+            layer: None
+        };
+        let third_segment = Segment{
+            a: Coord{lat:1.0, lon:1.0},
+            b: Coord{lat:6.0, lon: 3.0},
+            layer: None
+        };
+        let fourth_segment = Segment{
+            b: Coord{lat:1.0, lon:1.0},
+            a: Coord{lat:7.0, lon: -1.0},
+            layer: None
+        };
+        let non_contiguous_segment = Segment{
+            b: Coord{lat:-1.0, lon:1.0},
+            a: Coord{lat:7.0, lon: -1.0},
+            layer: None
+        };
+        assert!(first_segment.is_contiguous(&second_segment));
+        assert!(first_segment.is_contiguous(&third_segment));
+        assert!(first_segment.is_contiguous(&fourth_segment));
+        assert_eq!(first_segment.is_contiguous(&non_contiguous_segment), false);
+        assert_eq!(first_segment.is_contiguous(&first_segment), false);
+    }
+
+    #[test]
+    fn segment_intersection_layer_test() {
+        let first_segment = Segment{
+            a: Point{lat:1.0, lon: 1.0},
+            b: Point{lat: 4.0, lon: 4.0},
+            layer: Some(0)
+        };
+        let second_segment = Segment{
+            a: Point{lat:1.0, lon: 3.0},
+            b: Point{lat: 3.0, lon: 1.0},
+            layer: Some(-1)
+        };
+        let third_segment = Segment{
+            b: Point{lat:1.0, lon: 1.0},
+            a: Point{lat: -4.0, lon: -2.0},
+            layer: Some(-1)
+        };
+        assert_eq!(first_segment.intersection(&second_segment), None);
+        assert_eq!(first_segment.intersection(&third_segment), Some(Coord{lat: 1.0, lon: 1.0}));
     }
 
 }
