@@ -347,7 +347,9 @@ mod tests {
                     a: Point{lat:4.0, lon: 4.0},
                     b: Point{lat: 5.0, lon: 4.0}
                 }
-            ]
+            ],
+            forbidden_to_pedestrians: false,
+            forbidden_to_bikes: false
         };
         let point = Point{lat: 2.0, lon: 2.0};
         assert!( (road.length_from(&point, Direction::Backward) + road.length_from(&point, Direction::Forward) - road.length()).abs() < 0.1 );
