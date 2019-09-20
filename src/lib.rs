@@ -189,7 +189,7 @@ impl Road{
 
     /// Get the distance from a point to an end of the road
     pub fn length_from(&self, point: &Coord, direction: Direction) -> f64{
-        let nearest_point = self.distance_from_nearest_point(point).1;
+        //let nearest_point = self.distance_from_nearest_point(point).1;
         let mut distance = 0.0;
         match direction{
             Direction::Forward => {
