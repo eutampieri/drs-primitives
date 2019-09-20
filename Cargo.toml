@@ -1,5 +1,5 @@
 [package]
-name = "ors-primitives"
+name = "drs-primitives"
 version = "0.1.0"
 authors = ["Eugenio Tampieri <eugenio.tampieri@icloud.com>"]
 edition = "2018"
