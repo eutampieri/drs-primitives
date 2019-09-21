@@ -1,4 +1,5 @@
 const TOLERANCE: f64 = 1e-6;
+static SPATIAL_TOLERANCE: f64 = 0.5e-3; // 50 cm
 
 #[derive(Copy,Clone,Debug)]
 pub struct Coord{
@@ -74,15 +75,13 @@ impl Segment {
         ((self.a.lat, self.a.lon), ((self.b.lat, self.b.lon)))
     }
 
-    /// Check if two segments are contiguous (i.e. if the end of one segment corresponds with the beginning of another one)
+    /// Check if two segments are contiguous
+    /// (i.e. if the end of one segment corresponds with the beginning of another one
+    /// or a segment touches another segment without intersecting it)
     pub fn is_contiguous(&self, with: &Segment) -> bool {
-        let delta = (self.a - with.b, self.b - with.a, self.b - with.b, self.a - with.a);
-        ((delta.0.lat.abs() < TOLERANCE && delta.0.lon.abs() < TOLERANCE) ||
-        (delta.1.lat.abs() < TOLERANCE && delta.1.lon.abs() < TOLERANCE) ||
-        (delta.2.lat.abs() < TOLERANCE && delta.2.lon.abs() < TOLERANCE) ||
-        (delta.3.lat.abs() < TOLERANCE && delta.3.lon.abs() < TOLERANCE)) &&
-        !((delta.2.lat.abs() < TOLERANCE && delta.2.lon.abs() < TOLERANCE) &&
-        (delta.3.lat.abs() < TOLERANCE && delta.3.lon.abs() < TOLERANCE))
+        let delta = self.a - with.a;
+        (self.distance_from_point(&with.a).0.min(self.distance_from_point(&with.b).0) < SPATIAL_TOLERANCE) &&
+        !(delta.lat.abs() < TOLERANCE && delta.lon.abs() < TOLERANCE)
     }
 
     /// Check if two segments intersect
