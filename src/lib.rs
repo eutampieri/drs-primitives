@@ -431,7 +431,7 @@ mod tests {
         assert!(first_segment.is_contiguous(&third_segment));
         assert!(first_segment.is_contiguous(&fourth_segment));
         assert_eq!(first_segment.is_contiguous(&non_contiguous_segment), false);
-        //assert_eq!(first_segment.is_contiguous(&first_segment), false);
+        assert_eq!(first_segment.is_contiguous(&first_segment), false);
     }
 
     #[test]
