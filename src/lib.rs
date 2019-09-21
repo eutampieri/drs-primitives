@@ -79,9 +79,11 @@ impl Segment {
     /// (i.e. if the end of one segment corresponds with the beginning of another one
     /// or a segment touches another segment without intersecting it)
     pub fn is_contiguous(&self, with: &Segment) -> bool {
-        let delta = self.a - with.a;
-        (self.distance_from_point(&with.a).0.min(self.distance_from_point(&with.b).0) < SPATIAL_TOLERANCE) &&
-        !(delta.lat.abs() < TOLERANCE && delta.lon.abs() < TOLERANCE)
+        if self.a==with.a && self.b==with.b {
+            false
+        } else {
+            self.contains(&with.a)||self.contains(&with.b)||with.contains(&self.a)||with.contains(&self.b)
+        }
     }
 
     /// Check if two segments intersect
