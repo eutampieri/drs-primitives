@@ -1,4 +1,4 @@
-const TOLERANCE: f64 = 1e-6;
+const TOLERANCE: f64 = 1e-7;
 static SPATIAL_TOLERANCE: f64 = 0.5e-3; // 50 cm
 
 #[derive(Copy,Clone,Debug)]
