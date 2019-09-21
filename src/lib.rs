@@ -105,12 +105,10 @@ impl Segment {
 
         let over: f64 = ap*bq-aq*bp;
 
-        let x: f64 = (bp*cq-bq*cp)/over;
-        let y: f64 = (aq*cp-ap*cq)/over;
+        let ans = Coord{lat:(bp*cq-bq*cp)/over, lon:(aq*cp-ap*cq)/over};
 
-        if ((p1.lat<=p2.lat&&p1.lat<=x&&x<=p2.lat)||(p1.lat>=p2.lat&&p2.lat<=x&&x<=p1.lat))&&
-        ((q1.lat<=q2.lat&&q1.lat<=x&&x<=q2.lat)||(q1.lat>=q2.lat&&q2.lat<=x&&x<=q1.lat)){
-            Some(Coord{lat:x,lon:y})
+        if self.contains(&ans) && other.contains(&ans) {
+            Some(ans)
         } else {
             None
         }
