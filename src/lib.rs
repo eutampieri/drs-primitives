@@ -1,7 +1,7 @@
 const TOLERANCE: f64 = 1e-9;
 static SPATIAL_TOLERANCE: f64 = 0.5e-3; // 50 cm
 
-#[derive(Copy,Clone,Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Copy,Clone,Debug)]
 pub struct Coord{
     pub lat: f64,
     pub lon: f64
@@ -28,18 +28,6 @@ impl std::ops::Mul<f64> for Coord {
     type Output = Coord;
     fn mul(self, m: f64) -> Coord {
         Coord{lat:self.lat*m,lon:self.lon*m}
-    }
-}
-impl std::cmp::Ord for Coord {
-    fn cmp(&self, other: &Coord) -> std::cmp::Ordering {
-        if self.lon==other.lon {
-            if self.lat<other.lat { std::cmp::Ordering::Less }
-            else if self.lat>other.lat { std::cmp::Ordering::Greater }
-            else { std::cmp::Ordering::Equal }
-        } else {
-            if self.lon<other.lon { std::cmp::Ordering::Less }
-            else { std::cmp::Ordering::Greater }
-        }
     }
 }
 
