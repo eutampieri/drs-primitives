@@ -170,6 +170,7 @@ impl Segment {
 
 pub struct Road{
     pub segments: Vec<Segment>,
+    pub points: Vec<Coord>,
     pub name: Option<String>,
     pub forbidden_to_pedestrians: bool,
     pub forbidden_to_bikes: bool,
