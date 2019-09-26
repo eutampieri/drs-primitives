@@ -30,6 +30,18 @@ impl std::ops::Mul<f64> for Coord {
         Coord{lat:self.lat*m,lon:self.lon*m}
     }
 }
+impl std::cmp::Ord for Coord {
+    fn cmp(&self, other: &Coord) -> std::cmp::Ordering {
+        if self.lon==other.lon {
+            if self.lat<other.lat { std::cmp::Ordering::Less }
+            else if self.lat>other.lat { std::cmp::Ordering::Greater }
+            else { std::cmp::Ordering::Equal }
+        } else {
+            if self.lon<other.lon { std::cmp::Ordering::Less }
+            else { std::cmp::Ordering::Greater }
+        }
+    }
+}
 
 pub enum Direction {
     Forward,
