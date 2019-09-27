@@ -1,6 +1,9 @@
-const TOLERANCE: f64 = 1e-6;
+const TOLERANCE: f64 = 1e-9;
+//static SPATIAL_TOLERANCE: f64 = 0.5e-3; // 50 cm
 
-#[derive(Copy,Clone,Debug)]
+pub mod providers;
+
+#[derive(PartialOrd,Copy,Clone,Debug)]
 pub struct Coord{
     pub lat: f64,
     pub lon: f64
@@ -42,6 +45,7 @@ impl PartialEq for Coord{
         self.lat == other.lat && self.lon == other.lon
     }
 }
+
 impl Coord{
     /// Get the distance between two points in km
     pub fn distance(&self, from: &Coord) -> f64{
@@ -64,7 +68,8 @@ impl Coord{
 
 pub struct Segment {
     pub a: Coord,
-    pub b: Coord
+    pub b: Coord,
+    pub layer: Option<i8>,
 }
 
 impl Segment {
@@ -72,8 +77,24 @@ impl Segment {
         ((self.a.lat, self.a.lon), ((self.b.lat, self.b.lon)))
     }
 
+    /// Check if two segments are contiguous
+    /// (i.e. if the end of one segment corresponds with the beginning of another one
+    /// or a segment touches another segment without intersecting it)
+    pub fn is_contiguous(&self, with: &Segment) -> bool {
+        if self.a==with.a && self.b==with.b {
+            false
+        } else {
+            self.contains(&with.a)||self.contains(&with.b)||with.contains(&self.a)||with.contains(&self.b)
+        }
+    }
+
     /// Check if two segments intersect
     pub fn intersection(&self, other: &Segment) -> Option<Coord> {
+        if let Some(_) = self.layer{
+            if !self.is_contiguous(other) && self.layer !=other.layer{
+                return None;
+            }
+        }
         let p1 = self.a;
         let p2 = self.b;
         let q1 = other.a;
@@ -88,12 +109,10 @@ impl Segment {
 
         let over: f64 = ap*bq-aq*bp;
 
-        let x: f64 = (bp*cq-bq*cp)/over;
-        let y: f64 = (aq*cp-ap*cq)/over;
+        let ans = Coord{lat:(bp*cq-bq*cp)/over, lon:(aq*cp-ap*cq)/over};
 
-        if ((p1.lat<=p2.lat&&p1.lat<=x&&x<=p2.lat)||(p1.lat>=p2.lat&&p2.lat<=x&&x<=p1.lat))&&
-        ((q1.lat<=q2.lat&&q1.lat<=x&&x<=q2.lat)||(q1.lat>=q2.lat&&q2.lat<=x&&x<=q1.lat)){
-            Some(Coord{lat:x,lon:y})
+        if self.contains(&ans) && other.contains(&ans) {
+            Some(ans)
         } else {
             None
         }
@@ -123,7 +142,7 @@ impl Segment {
 
     /// Return a reversed Segment
     pub fn reverse(&self) -> Segment {
-        Segment{a: self.b, b: self.a}
+        Segment{a: self.b, b: self.a, layer: self.layer}
     }
 
     pub fn contains(&self, point: &Point) -> bool{
@@ -152,15 +171,50 @@ impl Segment {
 }
 
 pub struct Road{
-    pub segments: Vec<Segment>,
-    pub name: Option<String>
+    pub points: Vec<Coord>,
+    pub name: Option<String>,
+    pub forbidden_to_pedestrians: bool,
+    pub forbidden_to_bikes: bool,
+    pub layer: Option<i8>
 }
 impl Road{
 
+    /// Create a road from a vector of `Segment`s (legacy format)
+    pub fn from_segments(
+        segment_list: &Vec<Segment>,
+        name: Option<String>,
+        forbidden_to_bikes: bool,
+        forbidden_to_pedestrians: bool,
+        layer: Option<i8>
+    ) -> Road {
+        let mut point_list: Vec<Point> = Vec::new();
+        for segment in segment_list {
+            point_list.push(segment.a);
+        }
+        point_list.push(segment_list[&segment_list.len()-1].b);
+        Road{
+            points: point_list,
+            name: name,
+            forbidden_to_bikes: forbidden_to_bikes,
+            forbidden_to_pedestrians:forbidden_to_pedestrians,
+            layer: layer
+        }
+    }
+
+    /// Function to obtain the legacy `Vec<Segment>`
+    pub fn into_segments(&self) -> Vec<Segment>{
+        let mut result: Vec<Segment> = Vec::new();
+        for i in 1..self.points.len() {
+            result.push(Segment{a: self.points[i-1], b: self.points[i], layer: self.layer});
+        }
+        result
+    }
+
     pub fn center(&self) -> Coord {
         let mut result = Coord{lat: 0.0, lon: 0.0};
-        let min = &self.segments[0].a;
-        let max = &self.segments[&self.segments.len()-1].b;
+        let segments = self.into_segments();
+        let min = &segments[0].a;
+        let max = &segments[&segments.len()-1].b;
         result.lat = (min.lat+max.lat)/2.0;
         result.lon = (min.lon+max.lon)/2.0;
         result
@@ -169,7 +223,7 @@ impl Road{
     /// Get the road's total length
     pub fn length(&self) -> f64 {
         let mut total_length = 0.0;
-        for segment in &self.segments{
+        for segment in &self.into_segments(){
             total_length += segment.length();
         }
         total_length
@@ -178,7 +232,7 @@ impl Road{
     /// Get a tuple containing the distance from the nearest point of the road and the coordinates of the said point
     pub fn distance_from_nearest_point(&self, point: &Coord) -> (f64, Coord) {
         let mut min: (f64, Point) = (std::f64::MAX, Point{lat: 0.0, lon: 0.0});
-        for segment in &self.segments{
+        for segment in &self.into_segments() {
             let tmp = segment.distance_from_point(&point);
             if tmp.0 < min.0 {
                 min = tmp;
@@ -193,7 +247,7 @@ impl Road{
         let mut distance = 0.0;
         match direction{
             Direction::Forward => {
-                for segment in &self.segments{
+                for segment in &self.into_segments() {
                     if segment.strictly_contains(point){
                         distance += segment.a.distance(point);
                         break;
@@ -203,7 +257,7 @@ impl Road{
                 }
             },
             Direction::Backward => {
-                for segment in self.segments.iter().rev(){
+                for segment in self.into_segments().iter().rev(){
                     if segment.strictly_contains(point){
                         distance += segment.reverse().a.distance(point);
                         break;
@@ -214,6 +268,22 @@ impl Road{
             }
         }
         distance
+    }
+
+    /// Get the intersections with another road
+    pub fn intersections(&self, with: &Road) -> Vec<Coord> {
+        let mut result: Vec<Coord> = Vec::new();
+        for a_segment in &self.into_segments() {
+            for b_segment in &with.into_segments() {
+                if let Some(intersection) = a_segment.intersection(b_segment){
+                    if result.contains(&intersection) {
+                        continue;
+                    }
+                    result.push(intersection)
+                }
+            }
+        }
+        result
     }
 }
 
@@ -257,7 +327,8 @@ mod tests {
     fn nearest_point_from_segment_near_test() {
         let segment = Segment{
             a: Point{lat:1.0, lon: 1.0},
-            b: Point{lat: 4.0, lon: 4.0}
+            b: Point{lat: 4.0, lon: 4.0},
+            layer: None
         };
         let point = Point{lat: 1.0, lon: 3.0};
 
@@ -268,7 +339,8 @@ mod tests {
     fn nearest_point_from_segment_far_left_test() {
         let segment = Segment{
             a: Point{lat:1.0, lon: 1.0},
-            b: Point{lat: 4.0, lon: 4.0}
+            b: Point{lat: 4.0, lon: 4.0},
+            layer: None
         };
         let point = Point{lat: -1.0, lon: 2.0};
 
@@ -279,7 +351,8 @@ mod tests {
     fn nearest_point_from_segment_far_right_test() {
         let segment = Segment{
             a: Point{lat:1.0, lon: 1.0},
-            b: Point{lat: 4.0, lon: 4.0}
+            b: Point{lat: 4.0, lon: 4.0},
+            layer: None
         };
         let point = Point{lat: 6.0, lon: 5.0};
 
@@ -290,11 +363,13 @@ mod tests {
     fn segment_intersection_easy_test() {
         let first_segment = Segment{
             a: Point{lat:1.0, lon: 1.0},
-            b: Point{lat: 4.0, lon: 4.0}
+            b: Point{lat: 4.0, lon: 4.0},
+            layer: None
         };
         let second_segment = Segment{
             a: Point{lat:1.0, lon: 3.0},
-            b: Point{lat: 3.0, lon: 1.0}
+            b: Point{lat: 3.0, lon: 1.0},
+            layer: None
         };
         assert_eq!(first_segment.intersection(&second_segment), Some(Point{lat: 2.0, lon: 2.0}));
     }
@@ -303,11 +378,13 @@ mod tests {
     fn segment_intersection_end_test() {
         let first_segment = Segment{
             a: Point{lat:1.0, lon: 1.0},
-            b: Point{lat: 4.0, lon: 4.0}
+            b: Point{lat: 4.0, lon: 4.0},
+            layer: None
         };
         let second_segment = Segment{
             a: Point{lat:-1.0, lon: 3.0},
-            b: Point{lat: 1.0, lon: 1.0}
+            b: Point{lat: 1.0, lon: 1.0},
+            layer: None
         };
         assert_eq!(first_segment.intersection(&second_segment), Some(first_segment.a));
     }
@@ -316,11 +393,13 @@ mod tests {
     fn segment_intersection_none_test() {
         let first_segment = Segment{
             a: Point{lat:1.0, lon: 1.0},
-            b: Point{lat: 4.0, lon: 4.0}
+            b: Point{lat: 4.0, lon: 4.0},
+            layer: None
         };
         let second_segment = Segment{
             a: Point{lat:11.0, lon: 3.0},
-            b: Point{lat: 13.0, lon: 1.0}
+            b: Point{lat: 13.0, lon: 1.0},
+            layer: None
         };
         assert_eq!(first_segment.intersection(&second_segment), None);
     }
@@ -329,7 +408,8 @@ mod tests {
     fn on_segment_test() {
         let segment = Segment{
             a: Point{lat:1.0, lon: 1.0},
-            b: Point{lat: 4.0, lon: 4.0}
+            b: Point{lat: 4.0, lon: 4.0},
+            layer: None
         };
         let first_point = Point{
             lat: 2.0,
@@ -355,19 +435,68 @@ mod tests {
     fn partial_length_test() {
         let road = Road{
             name: None,
-            segments: vec![
-                Segment{
-                    a: Point{lat:1.0, lon: 1.0},
-                    b: Point{lat: 4.0, lon: 4.0}
-                },
-                Segment{
-                    a: Point{lat:4.0, lon: 4.0},
-                    b: Point{lat: 5.0, lon: 4.0}
-                }
-            ]
+            points: vec![Point{lat:1.0, lon: 1.0}, Point{lat: 4.0, lon: 4.0}, Point{lat: 5.0, lon: 4.0}],
+            forbidden_to_pedestrians: false,
+            forbidden_to_bikes: false,
+            layer: Some(0)
         };
         let point = Point{lat: 2.0, lon: 2.0};
         assert!( (road.length_from(&point, Direction::Backward) + road.length_from(&point, Direction::Forward) - road.length()).abs() < 0.1 );
+    }
+
+    #[test]
+    fn contiguity_test() {
+        let first_segment = Segment{
+            a: Coord{lat:1.0, lon:1.0},
+            b: Coord{lat:1.0, lon: 2.0},
+            layer: None
+        };
+        let second_segment = Segment{
+            a: Coord{lat:5.0, lon:1.0},
+            b: Coord{lat:1.0, lon: 2.0},
+            layer: None
+        };
+        let third_segment = Segment{
+            a: Coord{lat:1.0, lon:1.0},
+            b: Coord{lat:6.0, lon: 3.0},
+            layer: None
+        };
+        let fourth_segment = Segment{
+            b: Coord{lat:1.0, lon:1.0},
+            a: Coord{lat:7.0, lon: -1.0},
+            layer: None
+        };
+        let non_contiguous_segment = Segment{
+            b: Coord{lat:-1.0, lon:1.0},
+            a: Coord{lat:7.0, lon: -1.0},
+            layer: None
+        };
+        assert!(first_segment.is_contiguous(&second_segment));
+        assert!(first_segment.is_contiguous(&third_segment));
+        assert!(first_segment.is_contiguous(&fourth_segment));
+        assert_eq!(first_segment.is_contiguous(&non_contiguous_segment), false);
+        assert_eq!(first_segment.is_contiguous(&first_segment), false);
+    }
+
+    #[test]
+    fn segment_intersection_layer_test() {
+        let first_segment = Segment{
+            a: Point{lat:1.0, lon: 1.0},
+            b: Point{lat: 4.0, lon: 4.0},
+            layer: Some(0)
+        };
+        let second_segment = Segment{
+            a: Point{lat:1.0, lon: 3.0},
+            b: Point{lat: 3.0, lon: 1.0},
+            layer: Some(-1)
+        };
+        let third_segment = Segment{
+            b: Point{lat:1.0, lon: 1.0},
+            a: Point{lat: -4.0, lon: -2.0},
+            layer: Some(-1)
+        };
+        assert_eq!(first_segment.intersection(&second_segment), None);
+        assert_eq!(first_segment.intersection(&third_segment), Some(Coord{lat: 1.0, lon: 1.0}));
     }
 
 }
