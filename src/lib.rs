@@ -382,6 +382,7 @@ mod tests {
     fn partial_length_test() {
         let road = Road{
             name: None,
+            points: vec![],
             segments: vec![
                 Segment{
                     a: Point{lat:1.0, lon: 1.0},
