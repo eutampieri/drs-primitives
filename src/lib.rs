@@ -2,6 +2,7 @@ const TOLERANCE: f64 = 1e-9;
 //static SPATIAL_TOLERANCE: f64 = 0.5e-3; // 50 cm
 
 mod providers;
+use providers::*;
 
 #[derive(PartialOrd,Copy,Clone,Debug)]
 pub struct Coord{
