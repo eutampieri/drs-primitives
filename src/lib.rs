@@ -1,5 +1,5 @@
 const TOLERANCE: f64 = 1e-9;
-static SPATIAL_TOLERANCE: f64 = 0.5e-3; // 50 cm
+//static SPATIAL_TOLERANCE: f64 = 0.5e-3; // 50 cm
 
 #[derive(PartialOrd,Copy,Clone,Debug)]
 pub struct Coord{
@@ -169,18 +169,50 @@ impl Segment {
 }
 
 pub struct Road{
-    pub segments: Vec<Segment>,
     pub points: Vec<Coord>,
     pub name: Option<String>,
     pub forbidden_to_pedestrians: bool,
     pub forbidden_to_bikes: bool,
+    pub layer: Option<i8>
 }
 impl Road{
 
+    /// Create a road from a vector of `Segment`s (legacy format)
+    pub fn from_segments(
+        segment_list: &Vec<Segment>,
+        name: Option<String>,
+        forbidden_to_bikes: bool,
+        forbidden_to_pedestrians: bool,
+        layer: Option<i8>
+    ) -> Road {
+        let mut point_list: Vec<Point> = Vec::new();
+        for segment in segment_list {
+            point_list.push(segment.a);
+        }
+        point_list.push(segment_list[&segment_list.len()-1].b);
+        Road{
+            points: point_list,
+            name: name,
+            forbidden_to_bikes: forbidden_to_bikes,
+            forbidden_to_pedestrians:forbidden_to_pedestrians,
+            layer: layer
+        }
+    }
+
+    /// Function to obtain the legacy `Vec<Segment>`
+    pub fn into_segments(&self) -> Vec<Segment>{
+        let mut result: Vec<Segment> = Vec::new();
+        for i in 1..self.points.len() {
+            result.push(Segment{a: self.points[i-1], b: self.points[i], layer: self.layer});
+        }
+        result
+    }
+
     pub fn center(&self) -> Coord {
         let mut result = Coord{lat: 0.0, lon: 0.0};
-        let min = &self.segments[0].a;
-        let max = &self.segments[&self.segments.len()-1].b;
+        let segments = self.into_segments();
+        let min = &segments[0].a;
+        let max = &segments[&segments.len()-1].b;
         result.lat = (min.lat+max.lat)/2.0;
         result.lon = (min.lon+max.lon)/2.0;
         result
@@ -189,7 +221,7 @@ impl Road{
     /// Get the road's total length
     pub fn length(&self) -> f64 {
         let mut total_length = 0.0;
-        for segment in &self.segments{
+        for segment in &self.into_segments(){
             total_length += segment.length();
         }
         total_length
@@ -198,7 +230,7 @@ impl Road{
     /// Get a tuple containing the distance from the nearest point of the road and the coordinates of the said point
     pub fn distance_from_nearest_point(&self, point: &Coord) -> (f64, Coord) {
         let mut min: (f64, Point) = (std::f64::MAX, Point{lat: 0.0, lon: 0.0});
-        for segment in &self.segments{
+        for segment in &self.into_segments() {
             let tmp = segment.distance_from_point(&point);
             if tmp.0 < min.0 {
                 min = tmp;
@@ -213,7 +245,7 @@ impl Road{
         let mut distance = 0.0;
         match direction{
             Direction::Forward => {
-                for segment in &self.segments{
+                for segment in &self.into_segments() {
                     if segment.strictly_contains(point){
                         distance += segment.a.distance(point);
                         break;
@@ -223,7 +255,7 @@ impl Road{
                 }
             },
             Direction::Backward => {
-                for segment in self.segments.iter().rev(){
+                for segment in self.into_segments().iter().rev(){
                     if segment.strictly_contains(point){
                         distance += segment.reverse().a.distance(point);
                         break;
@@ -239,8 +271,8 @@ impl Road{
     /// Get the intersections with another road
     pub fn intersections(&self, with: &Road) -> Vec<Coord> {
         let mut result: Vec<Coord> = Vec::new();
-        for a_segment in &self.segments {
-            for b_segment in &with.segments {
+        for a_segment in &self.into_segments() {
+            for b_segment in &with.into_segments() {
                 if let Some(intersection) = a_segment.intersection(b_segment){
                     if result.contains(&intersection) {
                         continue;
@@ -382,21 +414,10 @@ mod tests {
     fn partial_length_test() {
         let road = Road{
             name: None,
-            points: vec![],
-            segments: vec![
-                Segment{
-                    a: Point{lat:1.0, lon: 1.0},
-                    b: Point{lat: 4.0, lon: 4.0},
-                    layer: None
-                },
-                Segment{
-                    a: Point{lat:4.0, lon: 4.0},
-                    b: Point{lat: 5.0, lon: 4.0},
-                    layer: None
-                }
-            ],
+            points: vec![Point{lat:1.0, lon: 1.0}, Point{lat: 4.0, lon: 4.0}, Point{lat: 5.0, lon: 4.0}],
             forbidden_to_pedestrians: false,
-            forbidden_to_bikes: false
+            forbidden_to_bikes: false,
+            layer: Some(0)
         };
         let point = Point{lat: 2.0, lon: 2.0};
         assert!( (road.length_from(&point, Direction::Backward) + road.length_from(&point, Direction::Forward) - road.length()).abs() < 0.1 );
