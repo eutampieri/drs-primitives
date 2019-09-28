@@ -17,7 +17,7 @@ pub trait TrainServiceProvider {
 }
 
 pub trait BikeSharingServiceProvider {
-	fn get_name(&self) -> &str;
+	fn get_name(&self) -> String;
 	fn get_id(&self) -> String;
 	fn get_nearest_station(&self, from: &super::Coord) -> Box<dyn BikeSharingStation>;
 	fn get_station_list(&self) -> Vec<Box<dyn BikeSharingStation>>;
